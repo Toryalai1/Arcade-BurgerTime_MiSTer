@@ -35,17 +35,17 @@ port
 	clock_12     : in std_logic;
 	reset        : in std_logic;
 	
-	dn_addr      : in  std_logic_vector(16 downto 0);
-	dn_data      : in  std_logic_vector(7 downto 0);
-	dn_wr        : in  std_logic;
-	
 	sound_req     : in std_logic;
 	sound_code_in : in std_logic_vector(7 downto 0);
 	sound_timing  : in std_logic;
 
 	audio_out     : out std_logic_vector(10 downto 0);
-		
-	dbg_cpu_addr: out std_logic_vector(15 downto 0)
+	dbg_cpu_addr: out std_logic_vector(15 downto 0);
+
+	dl_clk        : in std_logic;
+	dl_addr       : in std_logic_vector(16 downto 0);
+	dl_data       : in std_logic_vector(7 downto 0);
+	dl_wr         : in std_logic
   );
 end burger_time_sound;
 
@@ -72,6 +72,7 @@ architecture syn of burger_time_sound is
   -- program rom signals
   signal prog_rom_cs     : std_logic;
   signal prog_rom_do     : std_logic_vector(7 downto 0); 
+  signal prog_rom_we     : std_logic;
 
   -- working ram signals
   signal wram_cs         : std_logic;
@@ -110,8 +111,6 @@ architecture syn of burger_time_sound is
   signal du4  : integer range -32768*4096 to 32767*4096;
   signal uout : integer range -32768 to 32767;
   signal uout_lim : integer range -128 to 127;
-  
-  signal rom_cs  : std_logic;
   
 begin
 
@@ -356,20 +355,26 @@ port map(
  q    => wram_do
 );
 
-rom_cs <= '1' when dn_addr(16 downto 12) = "00000" else '0';
-
 -- program rom
-program_rom : work.dpram generic map (12)
-port map
-(
-	clock_a   => clock_12,
-	wren_a    => dn_wr and rom_cs,
-	address_a => dn_addr(11 downto 0),
-	data_a    => dn_data,
+--program_rom: entity work.sound_prog
+--port map(
+-- clk  => clock_12n,
+-- addr => cpu_addr(11 downto 0),
+-- data => prog_rom_do
+--);
 
-	clock_b   => clock_12n,
-	address_b => cpu_addr(11 downto 0),
-	q_b       => prog_rom_do
+prog_rom_we <= '1' when dl_wr = '1' and dl_addr(16 downto 12) = "01000" else '0';
+
+program_rom: entity work.dpram
+generic map( dWidth => 8, aWidth => 12)
+port map(
+ clk_a  => clock_12n,
+ addr_a => cpu_addr(11 downto 0),
+ q_a    => prog_rom_do,
+ clk_b  => dl_clk,
+ addr_b => dl_addr(11 downto 0),
+ we_b   => prog_rom_we,
+ d_b    => dl_data
 );
 
 -- AY-3-8910 #1
